@@ -1,27 +1,47 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from dotenv import load_dotenv
+import os
 
-db = SQLAlchemy() # db = database and SQLAlchemy = class - outside of func to be imported (if inside func, not able to be imported)
-migrate = Migrate() # Migrate class with an instance of migrate
+db = SQLAlchemy()
+migrate = Migrate()
+load_dotenv()
 
 
-def create_app():
+def create_app(testing=None):
     # __name__ stores the name of the module we're in
     app = Flask(__name__)
 
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False # need it but not important to know what it does but has to do with older SQLAlchemy
-    app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql+psycopg2://postgres:postgres@localhost:5432/bikes_development"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    if testing is None:
+        app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("SQLALCHEMY_DATABASE_URI")
+    else:
+        app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("SQLALCHEMY_TEST_DATABASE_URI")
+
+    from app.models.bike import Bike
 
     db.init_app(app)
-    migrate.init_app(app, db) # migration is instructions on how to set up my db - wiring flask app, flask server, postgres db, and the migrate tool that sets up the db
+    migrate.init_app(app, db)
 
-    from app.models.bike import Bike # import this class model to the db through migrate - okay that it is not accessed yet
+    from .routes.bike import bike_bp
+    app.register_blueprint(bike_bp)
 
-    from .routes.bike import bike_bp # import needs to be inside the func
-    app.register_blueprint(bike_bp) # brings in the bp from the bike.py and connects it to the app
+    from .routes.cyclist import cyclist_bp
+    app.register_blueprint(cyclist_bp)
 
     return app
 
     # flask db migrate -m " message " does migrate
     # flask db upgrade adds the migration and new table to the db
+
+    # "postgresql+psycopg2://postgres:postgres@localhost:5432/bikes_development"
+    # app config above hard codes how we can access the db - has to use postgres, pyscogp2, this port, this username, this database name
+    # if certain things are changed, we would then not be able to access it
+    # good to have separate db for development and for testing (can see that at the end in "bikes_development")
+    # for testing we need the db to be completely clean/empty each time - arrange in testing will put stuff into the db and don't want it there every time/day
+    # don't want that string living here in this __init__.py
+    # we want it in a .env file instead 
+    # do "touch .env" in terminal and it will show up to the left screen here
+    # can see it as .env with a little gear since it is a settings file
+    # is a hidden config file since it is a dot file
